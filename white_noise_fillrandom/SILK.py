@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     value_sizes = [1000]
 
-    os.system("cgcreate -g blkio:/test_group1")
+    os.system("sudo cgcreate -g io:test_group1")
 
     for value_size in value_sizes:
         target_dir = result_dir + str(value_size)+"/" 

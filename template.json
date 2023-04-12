@@ -1,27 +1,27 @@
 {
     "cpu_set": [    
         1,
-	2,
-	4,
+	    2,
+	    4,
         8,
         12
     ],
     "memtable_size_set": [
         "32*1024*1024",
         "64*1024*1024",
-	"128*1024*1024"
+	    "128*1024*1024"
     ],
     "storage_paths": [
         {
-            "path": "/home/jinghuan/rocksdb_nvme",
-            "media_type": "NVMeSSD"
+            "path": "/home/ymx/ssds_array",
+            "media_type": "NVMeSSDs"
         },
         {
             "path": "/home/jinghuan/rocksdb_ssd",
             "media_type": "SATASSD"
         },
         {
-            "path": "/home/jinghuan/rocksdb_hdd",
+            "path": "/home/ymx/rocksdb_hdd",
             "media_type": "SATAHDD"
         }
     ]

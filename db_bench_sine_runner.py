@@ -9,9 +9,9 @@ import psutil
 import db_bench_option
 
 from db_bench_option import *
-# from db_bench_option import CPU_IN_TOTAL
-# from db_bench_option import SUDO_PASSWD
-# from db_bench_option import CPU_RESTRICTING_TYPE
+from db_bench_option import CPU_IN_TOTAL
+from db_bench_option import SUDO_PASSWD
+from db_bench_option import CPU_RESTRICTING_TYPE
 from parameter_generator import HardwareEnvironment
 
 CGROUP_NAME = "test_group1"
@@ -117,7 +117,7 @@ def create_db_path(db_path):
 
 def initial_cgroup():
     cgcreate_result = subprocess.run(
-        ['cgcreate', '-g', 'blkio,cpu:/'+CGROUP_NAME], stdout=subprocess.PIPE)
+        ['sudo','cgcreate', '-g', 'io,cpu:'+CGROUP_NAME], stdout=subprocess.PIPE)
     if cgcreate_result.stdout.decode('utf-8') != "":
         raise Exception("Cgreate failed due to:" +
                         cgcreate_result.stdout.decode('utf-8'))
@@ -125,7 +125,7 @@ def initial_cgroup():
 
 def clean_cgroup():
     cgdelete_result = subprocess.run(
-        ['cgdelete', '-r', 'blkio,cpu:/'+CGROUP_NAME], stdout=subprocess.PIPE)
+        ['sudo','cgdelete', '-r', 'io,cpu:'+CGROUP_NAME], stdout=subprocess.PIPE)
     if cgdelete_result.stdout.decode('utf-8') != "":
         raise Exception("Cgreate failed due to:" +
                         cgdelete_result.stdout.decode('utf-8'))
@@ -156,7 +156,7 @@ def start_db_bench(db_bench_exec, db_path, options={}, cgroup={}, perf={}):
     if not cgroup:
         cgroup = {"cgexec": "/usr/bin/cgexec",
                   "argument": "-g",
-                  "groups": "blkio,cpu:"+CGROUP_NAME
+                  "groups": "io,cpu:"+CGROUP_NAME
                   }
     # print(options["db"])
     db_path = os.path.abspath(db_path)
@@ -169,8 +169,9 @@ def start_db_bench(db_bench_exec, db_path, options={}, cgroup={}, perf={}):
         bootstrap_list = []
 
         if cgroup:
-            # cgroup = {"cgexec":"/usr/bin/cgexec","argument","-g","groups","blkio,cpu:a_group"}
-            bootstrap_list.extend(cgroup.values())
+            # cgroup = {"cgexec":"/usr/bin/cgexec","argument","-g","groups","io,cpu:a_group"}
+            # bootstrap_list.extend(cgroup.values())
+            pass
 
         bootstrap_list.extend(db_bench_options)
 
@@ -421,7 +422,7 @@ class DB_TASK:
             device_map={"259:3":3000,"8:33":400,"8:5":600,"259:0":2400
                     }
 
-            os.system("cgcreate -g blkio:/test_group1")
+            os.system("sudo cgcreate -g io:test_group1")
             from math import sin
             while True:
                 try:
@@ -435,7 +436,7 @@ class DB_TASK:
                     for device in device_map:
                         max_bandwidth=device_map[device]/2
                         sine_bandwidth = max_bandwidth*sin(3.14/60*timer)+max_bandwidth
-                        os.system('cgset -r blkio.throttle.write_bps_device="'+device+' '+str(sine_bandwidth*1000000)+'" test_group1')
+                        os.system('cgset -r io.throttle.write_bps_device="'+device+' '+str(sine_bandwidth*1000000)+'" test_group1')
                         # self.record_pidstat(timer,psutil_db_bench,stat_recorder)
                     self.record_psutils(timer, psutil_db_bench, stat_recorder, gap)
                     pass
@@ -447,7 +448,7 @@ class DB_TASK:
     def run(self, gap=1, force_record=False):
         # clear the cache, or the read bytes will be influenced to be 0 in most cases.
         print("clear the memory cache since all input is the same")
-        os.system("sync; echo 1 > /proc/sys/vm/drop_caches")
+        os.system("sudo sync; sudo bash -c \"echo 1 > /proc/sys/vm/drop_caches\"")
         if self.cpu_cores == CPU_IN_TOTAL or force_record == True or CPU_RESTRICTING_TYPE == -1:
             self.run_in_full_cpu(gap)
         else:

@@ -19,7 +19,7 @@ DEFAULT_MEMTABLE_SIZE = 64 * 1024 * 2014  # 256M, memtable size
 DEFAULT_IMMU_COUNT = 2  # how many immutable tables
 DEFAULT_IMMU_COMBIN = 1  # forget about this
 DEFAULT_COMPACTION_TRIGGER = 4  # how many l0 compacted to l1
-DEFAULT_L1_SIZE = 64 * 1024 * 1024
+DEFAULT_L1_SIZE = 64 * 1024 * 1024 # too small
 
 
 # default disk options
@@ -30,8 +30,8 @@ DEFAULT_COMPRESSION = "none"
 DEFAULT_BLOOM_BIT = 10
 
 # default entry options
-DEFAULT_KEY_SIZE = 8
-DEFAULT_VALUE_SIZE = 100
+DEFAULT_KEY_SIZE = 16
+DEFAULT_VALUE_SIZE = 1000
 DEFAULT_DB_SIZE = int(default_cfg.get("Entry Control", "db_size"))
 DEFAULT_ENTRY_COUNT = int(DEFAULT_DB_SIZE / DEFAULT_VALUE_SIZE)
 
@@ -39,6 +39,7 @@ DEFAULT_ENTRY_COUNT = int(DEFAULT_DB_SIZE / DEFAULT_VALUE_SIZE)
 DEFAULT_COMPACTION_WORKER = str(multiprocessing.cpu_count())
 CPU_IN_TOTAL = int(default_cfg.get("CPU", "cpu_in_total"))
 
+# db_bench using db_bench options
 ori_parameter_list = {
     "db": DEFAULT_DB_BENCH,
     "benchmarks": "fillrandom",
@@ -56,8 +57,7 @@ ori_parameter_list = {
     "threads": 1,  # control the input pressure, increase all resource requirement
     "bloom_bits": str(DEFAULT_BLOOM_BIT),
     "compression_type": DEFAULT_COMPRESSION,
-    "base_background_compactions": 1,
-    "report_bg_io_stats": False,
+    "report_bg_io_stats": False,  # important to meassure the io time breakdown
     # "detailed_running_stats":True
 }
 
@@ -132,8 +132,8 @@ def parameter_tuning(db_bench, para_dic={}):
     print(db_bench)
     if db_bench == "":
         db_bench = DEFAULT_DB_BENCH
-    #filled_para_list = ["cgexec -g blkio:test_group1",db_bench]
-    # filled_para_list = ['/usr/bin/cgexec','-g','blkio:test_group1',db_bench]
+    #   filled_para_list = ["cgexec -g io:test_group1",db_bench]
+    # filled_para_list = ['/usr/bin/cgexec','-g','io:test_group1',db_bench]
     filled_para_list = [db_bench]
     # use para_dic to modify the default parameter
     parameter_list = {}
@@ -151,14 +151,17 @@ def parameter_tuning(db_bench, para_dic={}):
         parameter_list.pop("single_threaded_flush",None)
         # parameter_list["base_background_compactions"] = parameter_list["max_background_compactions"] 
         parameter_list["max_background_jobs"] = int(parameter_list["max_background_compactions"]) + int(parameter_list["max_background_flushes"])
+        parameter_list.pop("max_background_jobs",None)
     else:
+        # ye11 Question：max_background_jobs couldn't limit the num of background_compactions
         if parameter_list["max_background_compactions"] == 1:
             parameter_list["max_background_jobs"] = int(parameter_list["max_background_compactions"]) + 1
         else:
             parameter_list["max_background_jobs"] =  int(parameter_list["max_background_compactions"])
-
-        parameter_list.pop("max_background_compactions",None)
-        parameter_list.pop("max_background_flushes",None)
+        # ye11: we don't focus on max_background_jobs
+        parameter_list.pop("max_background_jobs",None)
+        # parameter_list.pop("max_background_compactions",None)
+        # parameter_list.pop("max_background_flushes",None)
 
 
 

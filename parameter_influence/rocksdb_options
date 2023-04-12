@@ -143,7 +143,7 @@
 
 # Configuration of Thread Pool
 - max_background_jobs (2 by default)
-- base_background_compactions (decided by max_background_jobs)
+# - base_background_compactions (decided by max_background_jobs)
 - max_background_comapactions (abandoned)
 - max_background_flushes
 - use_adaptive_mutex

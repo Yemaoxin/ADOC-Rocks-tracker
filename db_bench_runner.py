@@ -10,9 +10,9 @@ import time
 import db_bench_option
 
 from db_bench_option import *
-# from db_bench_option import CPU_IN_TOTAL
-# from db_bench_option import SUDO_PASSWD
-# from db_bench_option import CPU_RESTRICTING_TYPE
+from db_bench_option import CPU_IN_TOTAL
+from db_bench_option import SUDO_PASSWD
+from db_bench_option import CPU_RESTRICTING_TYPE
 from parameter_generator import HardwareEnvironment
 
 CGROUP_NAME = "test_group1"
@@ -118,7 +118,7 @@ def create_db_path(db_path):
 
 def initial_cgroup():
     cgcreate_result = subprocess.run(
-        ['cgcreate', '-g', 'blkio,cpu:/'+CGROUP_NAME], stdout=subprocess.PIPE)
+        ['sudo','cgcreate', '-g', 'io,cpu:'+CGROUP_NAME], stdout=subprocess.PIPE)
     if cgcreate_result.stdout.decode('utf-8') != "":
         raise Exception("Cgreate failed due to:" +
                         cgcreate_result.stdout.decode('utf-8'))
@@ -126,7 +126,7 @@ def initial_cgroup():
 
 def clean_cgroup():
     cgdelete_result = subprocess.run(
-        ['cgdelete', '-r', 'blkio,cpu:/'+CGROUP_NAME], stdout=subprocess.PIPE)
+        ['sudo','cgdelete', '-r', 'io,cpu:'+CGROUP_NAME], stdout=subprocess.PIPE)
     if cgdelete_result.stdout.decode('utf-8') != "":
         raise Exception("Cgreate failed due to:" +
                         cgdelete_result.stdout.decode('utf-8'))
@@ -136,8 +136,11 @@ def start_iostat(db_path):
     with open(db_path + "/iostat.txt", "wb") as out, open(db_path + "/iostat_err.txt", "wb") as err:
         print("iostat starting")
 
-        device_map = {"pm":"pmem1","nvme":"nvme0n1","ssd":"sda","hdd":"sdc1"}
-
+        device_map = {"pm":"pmem1",
+                      "nvme":"nvme0n1",
+                     #   "ssd":"sda",
+                      "hdd":"sdc1",
+                      "ssds":"md126"}
         iostat_list = ["iostat","1","-m"]
 
         for target_device in device_map:
@@ -155,34 +158,40 @@ def start_db_bench(db_bench_exec, db_path, options={}, cgroup={}, perf={}):
     ./db_bench --benchmarks="fillrandom" --key_size=16 --value_size=1024 --db="/media/supermt/hdd/rocksdb"
     """
     if not cgroup:
-        cgroup = {"cgexec": "/usr/bin/cgexec",
+        cgroup = { "sudo": "sudo",
+                  "cgexec": "/usr/bin/cgexec",
                   "argument": "-g",
-                  "groups": "blkio,cpu:"+CGROUP_NAME
+                  "groups": "io,cpu:"+CGROUP_NAME
                   }
     # print(options["db"])
     db_path = os.path.abspath(db_path)
     options["db"] = db_path
     create_target_dir(db_path)
     with open(db_path + "/stdout.txt", "wb") as out, open(db_path + "/stderr.txt", "wb") as err:
-        print("DB_BENCH starting, with parameters:")
+        print("db_bench_runner DB_BENCH starting, with parameters:")
         db_bench_options = parameter_tuning(
             os.path.abspath(db_bench_exec), para_dic=options)
         bootstrap_list = []
 
         if cgroup:
-            # cgroup = {"cgexec":"/usr/bin/cgexec","argument","-g","groups","blkio,cpu:a_group"}
-            bootstrap_list.extend(cgroup.values())
+            # cgroup = {"cgexec":"/usr/bin/cgexec","argument","-g","groups","io,cpu:a_group"}
+            # bootstrap_list.extend(cgroup.values())
+            pass
 
         bootstrap_list.extend(db_bench_options)
-
+        print(" ".join(bootstrap_list))
         db_bench_process = subprocess.Popen(
             bootstrap_list, stdout=out, stderr=err)
 
         # db_bench_process = subprocess.Popen(db_bench_options, stdout=out, stderr=err)
         print(parameter_printer(db_bench_options))
         # in case there are too many opened files
-        os.system('echo %s|sudo -S %s' % (SUDO_PASSWD, "prlimit --pid " +
-                                          str(db_bench_process.pid) + " --nofile=20480:40960"))
+        # sudo -S prlimit --pid   ***   --nofile=20480:40960
+        print('sudo -S %s' %  " prlimit --pid " +
+                                          str(db_bench_process.pid) + " --nofile=40960:40960")
+        # change this
+        os.system('sudo -S %s' % " prlimit --pid " +
+                                          str(db_bench_process.pid) + " --nofile=40960:40960" )
 
     print(db_bench_process.pid)
     return db_bench_process
@@ -256,6 +265,7 @@ class DB_TASK:
             timer = 0
             db_bench_process = start_db_bench(
                 self.db_bench, self.parameter_list["db"], self.parameter_list)
+            iostat_process = start_iostat(self.parameter_list["db"],)
             print("Mission started, output is in:%s" % self.result_dir)
             # create_target_dir(self.result_dir)
             while True:
@@ -385,7 +395,7 @@ class DB_TASK:
     def run_in_full_cpu(self, gap=1):
         restrict_cpus(self.cpu_cores, CPU_RESTRICTING_TYPE)
         self.parameter_list["max_background_compactions"] = self.cpu_cores
-        devices = ["sda", "sdb", "nvme0n1"]
+        devices = ["sda", "sdb", "nvme0n1","md126"]
         db_paths = []
 
         if "db_path" in self.parameter_list:
@@ -438,7 +448,7 @@ class DB_TASK:
     def run(self, gap=1, force_record=False):
         # clear the cache, or the read bytes will be influenced to be 0 in most cases.
         print("clear the memory cache since all input is the same")
-        os.system("sync; echo 1 > /proc/sys/vm/drop_caches")
+        os.system("sudo sync; sudo bash -c \"echo 1 > /proc/sys/vm/drop_caches\"")
         if self.cpu_cores == CPU_IN_TOTAL or force_record == True or CPU_RESTRICTING_TYPE == -1:
             self.run_in_full_cpu(gap)
         else:
@@ -492,10 +502,13 @@ class DB_launcher:
         return
 
     def run(self):
+        count=1
         for task in self.db_bench_tasks:
+            print( "start the task ",count)
             print("-----------------------------------------")
             print(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
             print("-----------------------------------------")
             task.run()
+            count+=1
             # print(self.options)
             # pass

@@ -55,7 +55,7 @@ if __name__ == '__main__':
         tuned_groups[config]=env
 
 
-    os.system("cgcreate -g blkio:/test_group1")
+    os.system("sudo cgcreate -g io:test_group1")
     result_dir = "sine_bandwidth_60GB/tuned/"
     for device in tuned_groups:  
         print(tuned_groups[device].path_list)

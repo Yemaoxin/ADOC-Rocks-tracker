@@ -1,0 +1,17 @@
+{
+    "cpu_set": [  
+	2
+    ],
+    "memtable_size_set": [
+        "64*1024*1024"
+    ],
+    "storage_paths": [
+         {
+           "path": "/home/ymx/ssds_array",
+            "media_type": "NVMeSSDs"
+        }
+
+    ]
+}
+
+       

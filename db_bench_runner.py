@@ -465,7 +465,7 @@ class DB_launcher:
         self.db_bench = db_bench
         self.options = copy.deepcopy(extend_options)
         self.prepare_directories(env, result_base)
-        initial_cgroup()
+        initial_cgroup() # we don't need
         return
 
     def prepare_directories(self, env: HardwareEnvironment, work_dir="./db"):
